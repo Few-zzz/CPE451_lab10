@@ -1,0 +1,381 @@
+import React, { useState, useEffect, useRef } from "react";
+import {
+  Text, StyleSheet, TouchableOpacity, ActivityIndicator, View, ScrollView, Animated
+} from "react-native";
+import { Picker } from '@react-native-picker/picker';
+import { LinearGradient } from "expo-linear-gradient";
+import { Feather, FontAwesome5 } from "@expo/vector-icons";
+
+const App = () => {
+  const [loading, setLoading] = useState(false);
+  const [weatherData, setWeatherData] = useState([]);
+  const [locationInfo, setLocationInfo] = useState(null);
+  const [status, setStatus] = useState("พร้อมใช้งาน");
+
+  const LOCATION_OPTIONS = [
+    { label: 'จตุจักร, กรุงเทพฯ', province: 'กรุงเทพมหานคร', amphoe: 'จตุจักร' },
+    { label: 'ห้วยขวาง, กรุงเทพฯ', province: 'กรุงเทพมหานคร', amphoe: 'ห้วยขวาง' },
+    { label: 'ลาดพร้าว, กรุงเทพฯ', province: 'กรุงเทพมหานคร', amphoe: 'ลาดพร้าว' },
+  ];
+  const [selectedLocation, setSelectedLocation] = useState(LOCATION_OPTIONS[0]);
+
+  // Token ของคุณ
+  const API_TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImp0aSI6ImE5ZDkwMWYxZTI5NDU5ODRjNGYxMjFlYjU2MWE4ZWExNGVjNDg5YmQwNjc3ZWI1MGNkZDUwOGUwY2ExYjRhMWQ1NWM3NzQ0ZDE0MThlZTMzIn0.eyJhdWQiOiIyIiwianRpIjoiYTlkOTAxZjFlMjk0NTk4NGM0ZjEyMWViNTYxYThlYTE0ZWM0ODliZDA2NzdlYjUwY2RkNTA4ZTBjYTFiNGExZDU1Yzc3NDRkMTQxOGVlMzMiLCJpYXQiOjE3NzM5MjgwOTIsIm5iZiI6MTc3MzkyODA5MiwiZXhwIjoxODA1NDY0MDkyLCJzdWIiOiI1MDU4Iiwic2NvcGVzIjpbXX0.iEiq13tvbMcxjfYgDbAcjfKl79ngE0GaOI8DAv3-30LY4F4aGvjKJXG9dSc1_w46XmiZhEw_YX2Qj0uPSky0TKxzaC71QHF25wpQR5bnLEtMet3IIqUbLfzksFQBSvNZHckqpGDkG9jVPni7BcEHMsgrmVEFOkf6v7iBiUBWwAQ53msxbWTFE52e09Dc78MbkDJYq6Vuh3KILHceMios-LzkZeSTAI7YbEjViXxwh72t0KumHT_P535vVtPZo2VxebwQ-3DcnArrsVXcFDWR1_zv7jsduidymBvbTWViyVuzj-99OzuicBvr9uLF2Qi9tGhN4TFiAZRWIGiXfdjhbtEiFUlHvd7ZK3UG3e3QdKXTP7cjMNdRZGEO8Bfr9tyJtaHWLDbfe1OoGnDo-Ti5EkxTGGyO8Ld5cE4Y2yx7ia0EWv99wc3bGsMnUECEf2yJTjo-XPKYVGgtbL_SK5LitMVStDSVKzOYDID05mLw0YBDv2N_ReL9FPy0fpuLUouyoteRbkK4rPEnykrTb2K1ZXGg63jocg6BQc_pD-CByfXUY_8GyMq7jfHu49Vi3L4bfDo3s499p_JUE1x082Zvf424LyiwAHpA-M0S6LUZTHwNgaOVnBnyEgENv0wWS7UCPQp6rQ2DTc8lML4bN29E5PRB9UZ2EFZoStJaio3GLgs"; 
+
+  // --- ตั้งค่าสถานที่ที่นี่ ---
+  const province = encodeURIComponent("กรุงเทพมหานคร");
+  const amphoe = encodeURIComponent("จตุจักร");
+  // -----------------------
+
+  const fetchWeather = async () => {
+    setLoading(true);
+    setStatus("กำลังดึงข้อมูลพยากรณ์...");
+    const province = encodeURIComponent(selectedLocation.province);
+    const amphoe = encodeURIComponent(selectedLocation.amphoe);
+    const API_URL = `https://data.tmd.go.th/nwpapi/v1/forecast/location/hourly/place?province=${province}&amphoe=${amphoe}&fields=tc,rh,cond&duration=12`;
+    try {
+      const response = await fetch(API_URL, {
+        method: 'GET',
+        headers: {
+          'accept': 'application/json',
+          'authorization': `Bearer ${API_TOKEN}`,
+        },
+      });
+
+      const json = await response.json();
+
+      if (json.WeatherForecasts && json.WeatherForecasts.length > 0) {
+        const entry = json.WeatherForecasts[0];
+        setWeatherData(entry.forecasts || []);
+        setLocationInfo(entry.location);
+        setStatus("อัปเดตข้อมูลสำเร็จ");
+      } else {
+        setStatus("ไม่พบข้อมูลจตุจักร กรุงเทพฯ");
+      }
+    } catch (error) {
+      setStatus("เชื่อมต่อล้มเหลว");
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getConditionText = (code) => {
+    const conditions = {
+      1: "ท้องฟ้าแจ่มใส", 2: "มีเมฆบางส่วน", 3: "เมฆเป็นส่วนมาก", 4: "มีเมฆมาก",
+      5: "ฝนตกเล็กน้อย", 6: "ฝนปานกลาง", 7: "ฝนตกหนัก", 8: "ฝนฟ้าคะนอง",
+      9: "หนาวจัด", 10: "หนาว", 11: "เย็น", 12: "ร้อนจัด"
+    };
+    return conditions[code] || "ไม่ระบุ";
+  };
+
+  const getWindSpeed = (code) => {
+    if (code <= 4) return "10 กม./ชม.";
+    if (code <= 7) return "20 กม./ชม.";
+    return "35 กม./ชม.";
+  };
+
+  const getRainChance = (code) => {
+    if (code <= 4) return "10%";
+    if (code <= 6) return "40%";
+    if (code <= 8) return "80%";
+    return "95%";
+  };
+
+  const computeFeelsLike = (tc, rh) => {
+    if (tc == null || rh == null) return "--";
+    const t = Number(tc);
+    const r = Number(rh);
+    // Heat index approximation
+    const index =
+      -8.78469475556 +
+      1.61139411 * t +
+      2.33854883889 * r -
+      0.14611605 * t * r -
+      0.012308094 * t * t -
+      0.0164248277778 * r * r +
+      0.002211732 * t * t * r +
+      0.00072546 * t * r * r -
+      0.000003582 * t * t * r * r;
+    return `${Math.round(index * 10) / 10}`;
+  };
+
+  const getTempRange = () => {
+    if (!weatherData || weatherData.length === 0) return { min: "--", max: "--" };
+    const temps = weatherData.map((it) => it.data.tc);
+    const min = Math.min(...temps).toFixed(1);
+    const max = Math.max(...temps).toFixed(1);
+    return { min, max };
+  };
+
+  const getWeatherIcon = (cond) => {
+    if (cond <= 4) return { name: 'sun', icon: Feather, color: '#ffe066' };
+    if (cond <= 7) return { name: 'cloud-sun', icon: FontAwesome5, color: '#ffd166' };
+    return { name: 'cloud-rain', icon: Feather, color: '#6bcfff' };
+  };
+
+  const getGradientColors = (cond) => {
+    if (cond <= 4) return ['#0f1d39', '#3f6bce'];
+    if (cond <= 7) return ['#1f2e5c', '#4f7fc2'];
+    return ['#1c2a45', '#2f4a84'];
+  };
+
+  useEffect(() => { fetchWeather(); }, [selectedLocation]);
+
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 650,
+      useNativeDriver: true,
+    }).start();
+  }, [fadeAnim]);
+
+  const current = weatherData && weatherData.length > 0 ? weatherData[0] : null;
+  const currentTemp = current?.data?.tc?.toFixed(1) ?? "--";
+  const currentRh = current?.data?.rh?.toFixed(0) ?? "--";
+  const currentCond = current ? getConditionText(current.data.cond) : "ไม่ระบุ";
+  const tempRange = getTempRange();
+  const windSpeed = current ? getWindSpeed(current.data.cond) : "--";
+  const rainChance = current ? getRainChance(current.data.cond) : "--";
+  const feelsLike = current ? computeFeelsLike(current.data.tc, current.data.rh) : "--";
+
+  const weatherIcon = current ? getWeatherIcon(current.data.cond) : { name: 'sun', icon: Feather, color: '#ffe066' };
+  const gradientColors = current ? getGradientColors(current.data.cond) : ['#0f1d39', '#3f6bce'];
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.skeletonHeader}>
+          <Animated.View style={[styles.skeletonLine, { width: '60%', opacity: fadeAnim }]} />
+          <Animated.View style={[styles.skeletonLine, { width: '35%', opacity: fadeAnim, marginTop: 10 }]} />
+          <Animated.View style={[styles.skeletonLine, { width: '100%', height: 120, marginTop: 16, opacity: fadeAnim }]} />
+        </View>
+        <View style={styles.skeletonRow}>
+          {[1, 2, 3, 4].map((item) => (
+            <Animated.View key={item} style={[styles.skeletonSquare, { opacity: fadeAnim }]} />
+          ))}
+        </View>
+        <View style={styles.skeletonGrid}>
+          {[...Array(6)].map((_, idx) => (
+            <Animated.View key={idx} style={[styles.skeletonCard, { opacity: fadeAnim }]} />
+          ))}
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.pickerCard}>
+        <Text style={styles.pickerLabel}>เลือกสถานที่</Text>
+        <View style={styles.pickerWrapper}>
+          <Picker
+            selectedValue={selectedLocation.label}
+            onValueChange={(itemValue, itemIndex) => setSelectedLocation(LOCATION_OPTIONS[itemIndex])}
+            dropdownIconColor="#fff"
+            style={styles.picker}
+            itemStyle={styles.pickerItem}
+          >
+            {LOCATION_OPTIONS.map((location) => (
+              <Picker.Item
+                key={location.label}
+                label={location.label}
+                value={location.label}
+              />
+            ))}
+          </Picker>
+        </View>
+      </View>
+      <LinearGradient colors={gradientColors} style={styles.headerCard} start={[0,0]} end={[1,1]}>
+        <View style={styles.headerTop}>
+          <Text style={styles.cityText}>{locationInfo ? locationInfo.province : selectedLocation.province}</Text>
+          <Text style={styles.subtitle}>{locationInfo ? `${locationInfo.amphoe} | ${locationInfo.province}` : selectedLocation.label}</Text>
+        </View>
+        <View style={styles.headerMain}>
+          {React.createElement(weatherIcon.icon, { name: weatherIcon.name, size: 52, color: weatherIcon.color })}
+          <View style={styles.tempAndCond}>
+            <Text style={styles.tempText}>{currentTemp}°</Text>
+            <Text style={styles.conditionText}>{currentCond}</Text>
+          </View>
+        </View>
+      </LinearGradient>
+
+      <Animated.View style={[styles.moduleRow, { opacity: fadeAnim, transform: [{ scale: fadeAnim.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1] }) }] }]}> 
+        <View style={styles.smallCard}>
+          <Text style={styles.smallTitle}>ความเชื่อมั่น</Text>
+          <Text style={styles.smallValue}>{status}</Text>
+        </View>
+        <View style={styles.smallCard}>
+          <Text style={styles.smallTitle}>ความชื้น</Text>
+          <Text style={styles.smallValue}>{currentRh}%</Text>
+        </View>
+      </Animated.View>
+
+      <Animated.View style={[styles.extraRow, { opacity: fadeAnim }]}> 
+        <View style={styles.statCard}>
+          <Text style={styles.statTitle}>10 วัน</Text>
+          <Text style={styles.statValue}>{tempRange.min}° / {tempRange.max}°</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statTitle}>ลม</Text>
+          <Text style={styles.statValue}>{windSpeed}</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statTitle}>ปริมาณฝน</Text>
+          <Text style={styles.statValue}>{rainChance}</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statTitle}>รู้สึกเหมือน</Text>
+          <Text style={styles.statValue}>{feelsLike}°</Text>
+        </View>
+      </Animated.View>
+
+      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+        <Text style={styles.sectionTitle}>พยากรณ์ชั่วโมงถัดไป</Text>
+        <View style={styles.grid}>
+          {weatherData.map((item, index) => {
+            const icon = item.data.cond <= 4 ? "☀️" : item.data.cond <= 7 ? "⛅" : "🌧️";
+            return (
+              <View key={index} style={styles.hourCard}>
+                <Text style={styles.hourTime}>{item.time.split('T')[1].substring(0, 5)}</Text>
+                <Text style={styles.hourIcon}>{icon}</Text>
+                <Text style={styles.hourTemp}>{item.data.tc.toFixed(1)}°</Text>
+                <Text style={styles.hourCond}>{getConditionText(item.data.cond)}</Text>
+              </View>
+            );
+          })}
+        </View>
+
+        <TouchableOpacity style={styles.refreshBtn} onPress={fetchWeather} disabled={loading}>
+          <Text style={styles.refreshText}>{loading ? "กำลังอัปเดต..." : "อัปเดตข้อมูลใหม่"}</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#0f1d39', paddingTop: 38, paddingHorizontal: 16 },
+  pickerCard: { 
+    marginBottom: 16, 
+    backgroundColor: 'rgba(255,255,255,0.1)', 
+    borderRadius: 16, 
+    padding: 14, 
+    borderWidth: 1, 
+    borderColor: 'rgba(255,255,255,0.2)' 
+  },
+  pickerLabel: { 
+    color: '#b0c4de', 
+    fontSize: 13, 
+    fontWeight: '600',
+    marginBottom: 8,
+    marginLeft: 4
+  },
+  pickerWrapper: { 
+    backgroundColor: 'rgba(0, 0, 0, 0.3)', // ปรับให้เข้มขึ้นเพื่อให้ตัวหนังสือสีขาวเด่น
+    borderRadius: 12, 
+    overflow: 'hidden', 
+    borderWidth: 1, 
+    borderColor: 'rgba(255,255,255,0.3)',
+    justifyContent: 'center'
+  },
+  picker: { 
+    color: '#ffffff', 
+    height: 55, // เพิ่มความสูงเพื่อให้เห็นตัวหนังสือครบ
+    width: '100%',
+  },
+  // สำหรับ Android บาง version ต้องปรับ itemStyle
+  pickerItem: { 
+    fontSize: 16, 
+    color: '#ffffff',
+    height: 55,
+  },
+  headerCard: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 20,
+    padding: 18,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  cityText: { fontSize: 26, fontWeight: '700', color: '#fff', marginBottom: 2 },
+  subtitle: { fontSize: 13, color: '#b8d3ff', marginBottom: 14 },
+  tempText: { fontSize: 64, fontWeight: '800', color: '#fff', letterSpacing: 1.3 },
+  conditionText: { fontSize: 18, color: '#d6e3ff', marginTop: 6 },
+  headerTop: { marginBottom: 8 },
+  headerMain: { flexDirection: 'row', alignItems: 'center' },
+  tempAndCond: { marginLeft: 14 },
+
+  skeletonHeader: { padding: 16, backgroundColor: '#1b2b51', borderRadius: 16, marginBottom: 12 },
+  skeletonLine: { height: 14, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 8 },
+  skeletonRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  skeletonSquare: { width: '23%', height: 72, backgroundColor: 'rgba(255,255,255,0.14)', borderRadius: 12 },
+  skeletonGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  skeletonCard: { width: '48%', height: 120, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)', marginBottom: 10 },
+
+  moduleRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  extraRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 12 },
+  smallCard: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.13)',
+    marginRight: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    padding: 12,
+    minHeight: 80,
+    justifyContent: 'center',
+  },
+  statCard: {
+    width: '48%',
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    marginBottom: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    padding: 10,
+    justifyContent: 'center',
+    minHeight: 70,
+  },
+  statTitle: { color: '#d7e5ff', fontSize: 11, marginBottom: 4 },
+  statValue: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  smallTitle: { color: '#cfd9ff', fontSize: 12, marginBottom: 4 },
+  smallValue: { color: '#fff', fontWeight: '700', fontSize: 16 },
+
+  scroll: { flex: 1 },
+  sectionTitle: { color: '#c0d5ff', fontSize: 15, fontWeight: '700', paddingVertical: 8 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  hourCard: {
+    width: '48%',
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  hourTime: { color: '#dbe8ff', fontSize: 12, marginBottom: 6 },
+  hourIcon: { fontSize: 24, textAlign: 'center', marginBottom: 6 },
+  hourTemp: { color: '#fff', fontSize: 20, fontWeight: '700', textAlign: 'center' },
+  hourCond: { color: '#c5d8ff', fontSize: 11, textAlign: 'center', marginTop: 4 },
+
+  refreshBtn: {
+    marginTop: 10,
+    marginBottom: 24,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)',
+  },
+  refreshText: { color: '#eef5ff', fontWeight: '700', fontSize: 14 }
+});
+
+export default App;
